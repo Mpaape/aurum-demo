@@ -15,6 +15,7 @@ jobs:
     uses: Mpaape/AurumCode/.github/workflows/review.yml@c638e04b8ff7486070379b81b8658e4b3c0a6a92
     with:
       model: ${{ vars.LLM_MODEL }}
+      provider: ${{ vars.LLM_PROVIDER }}   # perfil do provedor (ex.: anthropic); vazio = endpoint OpenAI-compatível
       policy_repository: Mpaape/aurum-demo-security-policy        # segurança: gate, regras IA-*, ignore e exceções
       policy_ref: 1e9dccd260299c505c0d88de05020257731eae9d                # SHA fixa da main do security-policy
       standards_repository: Mpaape/aurum-demo-devops-policy  # engenharia: skills PAD-*/QA-* e analistas padroes e qa
