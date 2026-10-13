@@ -1,0 +1,26 @@
+# Workflow do serviço: toda PR passa pela revisão do AurumCode com as duas
+# camadas centrais. run.sh troca c638e04b8ff7486070379b81b8658e4b3c0a6a92, Mpaape/aurum-demo-security-policy, 1e9dccd260299c505c0d88de05020257731eae9d,
+# Mpaape/aurum-demo-devops-policy e a077f09ee02536b36fcb7507587af6e3a144de57 pelos valores da execução.
+name: Code review
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+  pull-requests: write
+  statuses: write
+  checks: read
+jobs:
+  review:
+    uses: Mpaape/AurumCode/.github/workflows/review.yml@c638e04b8ff7486070379b81b8658e4b3c0a6a92
+    with:
+      model: ${{ vars.LLM_MODEL }}
+      policy_repository: Mpaape/aurum-demo-security-policy        # segurança: gate, regras IA-*, ignore e exceções
+      policy_ref: 1e9dccd260299c505c0d88de05020257731eae9d                # SHA fixa da main do security-policy
+      standards_repository: Mpaape/aurum-demo-devops-policy  # engenharia: skills PAD-*/QA-* e analistas padroes e qa
+      standards_ref: a077f09ee02536b36fcb7507587af6e3a144de57          # SHA fixa da main do devops-policy
+    secrets:
+      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+      LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
+      AURUMCODE_POLICY_TOKEN: ${{ secrets.AURUMCODE_POLICY_TOKEN }}        # só se o security-policy for privado
+      AURUMCODE_STANDARDS_TOKEN: ${{ secrets.AURUMCODE_STANDARDS_TOKEN }}  # só se o devops-policy for privado
