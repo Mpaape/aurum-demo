@@ -18,7 +18,7 @@ jobs:
       policy_repository: Mpaape/aurum-demo-security-policy        # segurança: gate, regras IA-*, ignore e exceções
       policy_ref: 1e9dccd260299c505c0d88de05020257731eae9d                # SHA fixa da main do security-policy
       standards_repository: Mpaape/aurum-demo-devops-policy  # engenharia: skills PAD-*/QA-* e analistas padroes e qa
-      standards_ref: a077f09ee02536b36fcb7507587af6e3a144de57          # SHA fixa da main do devops-policy
+      standards_ref: d8ff975ca9c0ad30d4a333ead56df77c4af04379          # SHA fixa da main do devops-policy
     secrets:
       LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
       LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
