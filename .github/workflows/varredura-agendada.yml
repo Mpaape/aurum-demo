@@ -1,0 +1,148 @@
+# Varredura agendada da branch padrão: todos os tipos de vulnerabilidade que a
+# revisão de PR conhece (código, segredos no histórico, regras das camadas de
+# segurança e de engenharia), sobre a árvore inteira, com os alertas na aba
+# Security. Complementa o schedule de code-review.yml, que varre só as
+# dependências (base OSV). Pode ser disparada à mão (workflow_dispatch) no dia
+# da instalação, para a primeira varredura.
+#
+# Como: um commit órfão vazio, criado só no runner e nunca enviado, serve de
+# --base; a árvore inteira conta como adicionada e a revisão normal faz o
+# resto (política, camada de padrões, skills, analistas, gate, SARIF e
+# auditoria). O SARIF sobe com categoria própria, para a próxima PR não fechar
+# estes alertas.
+name: Varredura agendada
+on:
+  schedule:
+    - cron: "53 6 * * *"   # diária, 06:53 UTC, meia hora depois da de dependências
+  workflow_dispatch:       # primeira varredura no dia da instalação, sem esperar o cron
+  pull_request:            # o workflow testa a si mesmo na PR que o altera
+    paths: [.github/workflows/varredura-agendada.yml]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aurumcode-varredura-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  varredura:
+    name: Revisão da árvore inteira
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Check provider configuration
+        env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${LLM_API_KEY}" ] || [ -z "${LLM_BASE_URL}" ]; then
+            echo "::error::Faltam os secrets LLM_API_KEY e LLM_BASE_URL; a varredura não roda."
+            exit 1
+          fi
+
+      - name: Checkout AurumCode
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: Mpaape/AurumCode
+          ref: 065c7b12c1c6059f4c436d22a333b897493892ea   # v2.0.0
+          path: .aurumcode-tool
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Build AurumCode image
+        run: docker build --build-arg AURUMCODE_VERSION=v2.0.0 --tag aurumcode-review .aurumcode-tool
+
+      - name: Checkout da branch padrão (histórico completo)
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          path: .aurumcode-target
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Checkout da política de segurança
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: Mpaape/aurum-demo-security-policy
+          ref: 8e31dd4dbcbf4ba1809daad89772a1435c747358
+          path: .aurumcode-policy
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Checkout dos padrões de engenharia
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: Mpaape/aurum-demo-devops-policy
+          ref: c6e2d8c5b667295a3350bb83abee56f39e3b37b9
+          path: .aurumcode-standards
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Base vazia (commit órfão local, nunca enviado)
+        id: base
+        working-directory: .aurumcode-target
+        env:
+          GIT_AUTHOR_NAME: aurumcode
+          GIT_AUTHOR_EMAIL: aurumcode@localhost
+          GIT_COMMITTER_NAME: aurumcode
+          GIT_COMMITTER_EMAIL: aurumcode@localhost
+        run: |
+          set -euo pipefail
+          empty_tree="$(git hash-object -t tree -w /dev/null)"
+          base="$(git commit-tree "${empty_tree}" -m "base vazia para a varredura inicial")"
+          echo "sha=${base}" >> "$GITHUB_OUTPUT"
+
+      - name: Revisão da árvore inteira
+        env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
+          LLM_MODEL: ${{ vars.LLM_MODEL }}
+          LLM_PROVIDER: ${{ vars.LLM_PROVIDER }}
+          BASE_SHA: ${{ steps.base.outputs.sha }}
+        run: |
+          set -euo pipefail
+          out_dir="${RUNNER_TEMP}/aurumcode-out"
+          mkdir -p "${out_dir}"
+          rc=0
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}/.aurumcode-target:/github/workspace:ro" \
+            -v "${GITHUB_WORKSPACE}/.aurumcode-policy:/github/policy:ro" \
+            -v "${GITHUB_WORKSPACE}/.aurumcode-standards:/github/standards:ro" \
+            -v "${out_dir}:/aurumcode-out" \
+            -w /github/workspace \
+            -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=/github/workspace \
+            -e LLM_API_KEY -e LLM_BASE_URL -e LLM_MODEL -e LLM_PROVIDER \
+            --entrypoint /app/aurumcode aurumcode-review \
+            review --base "${BASE_SHA}" --seguranca \
+              --politica /github/policy --padroes /github/standards \
+              --sarif /aurumcode-out/aurumcode-varredura.sarif \
+              --auditoria /aurumcode-out/aurumcode-varredura-auditoria.json \
+            | tee "${out_dir}/parecer.md" || rc=$?
+          # O container escreve como root; entrega os arquivos ao runner.
+          docker run --rm --entrypoint chown -v "${out_dir}:/aurumcode-out" aurumcode-review \
+            -R "$(id -u):$(id -g)" /aurumcode-out
+          case "${rc}" in
+            0) echo "varredura concluída: nenhum achado bloqueante" ;;
+            3) echo "varredura concluída: há achados bloqueantes (ver SARIF e parecer)" ;;
+            *) echo "::error::varredura não concluiu (exit ${rc}); o SARIF não é enviado, nenhum alerta é fechado"; exit "${rc}" ;;
+          esac
+          test -s "${out_dir}/aurumcode-varredura.sarif"
+          { echo "## Varredura da árvore inteira"; echo; cat "${out_dir}/parecer.md"; } >> "$GITHUB_STEP_SUMMARY"
+
+      # Só depois de uma varredura concluída (success(), nunca always()).
+      - name: SARIF na aba Security (categoria própria)
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: ${{ runner.temp }}/aurumcode-out/aurumcode-varredura.sarif
+          category: aurumcode/varredura-agendada
+          checkout_path: ${{ github.workspace }}/.aurumcode-target
+
+      - name: Artefatos (SARIF, auditoria e parecer)
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: aurumcode-varredura
+          path: ${{ runner.temp }}/aurumcode-out/
