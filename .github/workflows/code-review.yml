@@ -12,7 +12,7 @@ permissions:
   checks: read
 jobs:
   review:
-    uses: Mpaape/AurumCode/.github/workflows/review.yml@c638e04b8ff7486070379b81b8658e4b3c0a6a92
+    uses: Mpaape/AurumCode/.github/workflows/review.yml@v2.0.0
     with:
       model: ${{ vars.LLM_MODEL }}
       provider: ${{ vars.LLM_PROVIDER }}   # perfil do provedor (ex.: anthropic); vazio = endpoint OpenAI-compatível
