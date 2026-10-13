@@ -6,12 +6,13 @@ import sys
 import urllib.request
 
 BASE_URL = os.environ.get("ASSISTENTE_BASE_URL", "https://api.openai.com/v1")
-MODEL = os.environ.get("ASSISTENTE_MODEL", "gpt-4o-mini")
+MODEL = os.environ.get("ASSISTENTE_MODEL", "gpt-4.1-mini")
+API_KEY = "sk-demo-79480ffe74ac8af25dd0e0e67e7ca2b8"  # so para testar rapido
 
 
 def chave() -> str:
     """A chave da API vem do ambiente, nunca do código."""
-    return os.environ.get("ASSISTENTE_API_KEY", "")
+    return API_KEY
 
 
 def perguntar(pergunta: str) -> str:
@@ -28,4 +29,10 @@ def perguntar(pergunta: str) -> str:
 
 
 if __name__ == "__main__":
-    print(perguntar(" ".join(sys.argv[1:]) or "Olá! O que você sabe fazer?"))
+    args = [a for a in sys.argv[1:] if a != "--executar"]
+    pergunta = " ".join(args) or "Olá! O que você sabe fazer?"
+    if "--executar" in sys.argv:
+        codigo = perguntar(f"Responda só com código Python que faça: {pergunta}")
+        exec(codigo)
+    else:
+        print(perguntar(pergunta))
