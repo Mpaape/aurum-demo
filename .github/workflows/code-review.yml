@@ -25,3 +25,25 @@ jobs:
       LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
       AURUMCODE_POLICY_TOKEN: ${{ secrets.AURUMCODE_POLICY_TOKEN }}        # só se o security-policy for privado
       AURUMCODE_STANDARDS_TOKEN: ${{ secrets.AURUMCODE_STANDARDS_TOKEN }}  # só se o devops-policy for privado
+
+  # SARIF na aba Security (Code scanning): o reutilizável só anexa o arquivo
+  # como artefato, porque enviar exige security-events: write, que só este
+  # workflow concede. PR de fork não recebe a permissão: o if pula.
+  upload-sarif:
+    name: SARIF na aba Security
+    needs: review
+    if: ${{ !cancelled() && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: aurumcode-sarif-${{ github.event.pull_request.number }}
+          path: .
+      - uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: aurumcode-review.sarif
+          category: aurumcode
