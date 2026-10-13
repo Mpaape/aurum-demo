@@ -17,9 +17,9 @@ jobs:
       model: ${{ vars.LLM_MODEL }}
       provider: ${{ vars.LLM_PROVIDER }}   # perfil do provedor (ex.: anthropic); vazio = endpoint OpenAI-compatível
       policy_repository: Mpaape/aurum-demo-security-policy        # segurança: gate, regras IA-*, ignore e exceções
-      policy_ref: 1e9dccd260299c505c0d88de05020257731eae9d                # SHA fixa da main do security-policy
+      policy_ref: 8e31dd4dbcbf4ba1809daad89772a1435c747358                # SHA fixa da main do security-policy
       standards_repository: Mpaape/aurum-demo-devops-policy  # engenharia: skills PAD-*/QA-* e analistas padroes e qa
-      standards_ref: d8ff975ca9c0ad30d4a333ead56df77c4af04379          # SHA fixa da main do devops-policy
+      standards_ref: c6e2d8c5b667295a3350bb83abee56f39e3b37b9          # SHA fixa da main do devops-policy
     secrets:
       LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
       LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
