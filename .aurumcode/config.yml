@@ -6,3 +6,15 @@ review:
   language: pt-BR
   inline_comments: true   # o que bloqueia vira comentário na linha, com a correção aplicável
   profiles: [seguranca, padroes, qa]   # analistas: seguranca (embutido) e os do devops-policy
+scheduled:
+  plugins:
+    # Agente de scan de vulnerabilidade (harness da Visa, só descoberta): roda
+    # no agendamento e no disparo manual, nunca em PR; os achados vão só para
+    # a aba Security, nunca para log, resumo ou artefato.
+    - name: vvah
+      dockerfile: plugins/vvah/Dockerfile
+      env: [ANTHROPIC_API_KEY, VVAH_MODEL]
+      output:
+        format: vvah-findings
+        path: security-scan/findings.json
+      timeout_minutes: 90

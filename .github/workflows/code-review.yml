@@ -6,16 +6,19 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
   schedule:
-    - cron: "23 6 * * *"   # varredura diária de dependências da main (06:23 UTC), sem PR
+    - cron: "23 6 * * *"   # varredura diária da main (06:23 UTC): dependências e plugins agendados, sem PR
+  workflow_dispatch:       # disparo manual dos plugins agendados (só na branch padrão)
 
 permissions:
   contents: read
   pull-requests: write
   statuses: write
   checks: read
+  actions: read            # plugins agendados: o upload-sarif precisa em repositório privado
+  security-events: write   # plugins agendados: os achados vão só para a aba Security
 jobs:
   review:
-    uses: Mpaape/AurumCode/.github/workflows/review.yml@v2.0.0
+    uses: Mpaape/AurumCode/.github/workflows/review.yml@v2.1.0
     with:
       model: ${{ vars.LLM_MODEL }}
       provider: ${{ vars.LLM_PROVIDER }}   # perfil do provedor (ex.: anthropic); vazio = endpoint OpenAI-compatível
@@ -23,11 +26,9 @@ jobs:
       policy_ref: 8e31dd4dbcbf4ba1809daad89772a1435c747358                # SHA fixa da main do security-policy
       standards_repository: Mpaape/aurum-demo-devops-policy  # engenharia: skills PAD-*/QA-* e analistas padroes e qa
       standards_ref: c6e2d8c5b667295a3350bb83abee56f39e3b37b9          # SHA fixa da main do devops-policy
-    secrets:
-      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-      LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
-      AURUMCODE_POLICY_TOKEN: ${{ secrets.AURUMCODE_POLICY_TOKEN }}        # só se o security-policy for privado
-      AURUMCODE_STANDARDS_TOKEN: ${{ secrets.AURUMCODE_STANDARDS_TOKEN }}  # só se o devops-policy for privado
+    # inherit: repassa LLM_*, os tokens das camadas (se privadas) e os secrets
+    # que o plugin agendado declara em scheduled.plugins.env.
+    secrets: inherit
 
   # SARIF na aba Security (Code scanning): o reutilizável só anexa o arquivo
   # como artefato, porque enviar exige security-events: write, que só este
