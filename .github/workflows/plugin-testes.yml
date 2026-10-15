@@ -13,3 +13,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Testes do perfil so descoberta
         run: python3 -I -m unittest discover -s plugins/vvah -v
+      # O perfil e gerado no build contra o default.yaml real do harness
+      # fixado: se o formato mudar, o build da PR falha aqui.
+      - name: Build da imagem do plugin (perfil contra o harness real)
+        run: docker build -q -f plugins/vvah/Dockerfile -t vvah-teste plugins/vvah
