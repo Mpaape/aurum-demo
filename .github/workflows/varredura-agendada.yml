@@ -49,13 +49,13 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: Mpaape/AurumCode
-          ref: 065c7b12c1c6059f4c436d22a333b897493892ea   # v2.0.0
+          ref: da344afd7c8000f0022c50975d267a8f4e3a6577   # v2.1.0
           path: .aurumcode-tool
           persist-credentials: false
           fetch-depth: 1
 
       - name: Build AurumCode image
-        run: docker build --build-arg AURUMCODE_VERSION=v2.0.0 --tag aurumcode-review .aurumcode-tool
+        run: docker build --build-arg AURUMCODE_VERSION=v2.1.0 --tag aurumcode-review .aurumcode-tool
 
       - name: Checkout da branch padrão (histórico completo)
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -121,7 +121,10 @@ jobs:
               --politica /github/policy --padroes /github/standards \
               --sarif /aurumcode-out/aurumcode-varredura.sarif \
               --auditoria /aurumcode-out/aurumcode-varredura-auditoria.json \
-            | tee "${out_dir}/parecer.md" || rc=$?
+            >"${out_dir}/parecer.md" 2>&1 || rc=$?
+          # Repositório público: log, resumo e artefato do run são visíveis a
+          # qualquer pessoa. O parecer fica só no runner; os achados vão só
+          # para a aba Security (visível a quem tem escrita).
           # O container escreve como root; entrega os arquivos ao runner.
           docker run --rm --entrypoint chown -v "${out_dir}:/aurumcode-out" aurumcode-review \
             -R "$(id -u):$(id -g)" /aurumcode-out
@@ -131,7 +134,9 @@ jobs:
             *) echo "::error::varredura não concluiu (exit ${rc}); o SARIF não é enviado, nenhum alerta é fechado"; exit "${rc}" ;;
           esac
           test -s "${out_dir}/aurumcode-varredura.sarif"
-          { echo "## Varredura da árvore inteira"; echo; cat "${out_dir}/parecer.md"; } >> "$GITHUB_STEP_SUMMARY"
+          n="$(jq '[.runs[].results[]] | length' "${out_dir}/aurumcode-varredura.sarif")"
+          echo "${n} alertas enviados para a aba Security (visível só para quem tem escrita)."
+          { echo "## Varredura da árvore inteira"; echo; echo "${n} alertas enviados para a aba Security (visível só para quem tem escrita)."; } >> "$GITHUB_STEP_SUMMARY"
 
       # Só depois de uma varredura concluída (success(), nunca always()).
       - name: SARIF na aba Security (categoria própria)
@@ -140,9 +145,3 @@ jobs:
           sarif_file: ${{ runner.temp }}/aurumcode-out/aurumcode-varredura.sarif
           category: aurumcode/varredura-agendada
           checkout_path: ${{ github.workspace }}/.aurumcode-target
-
-      - name: Artefatos (SARIF, auditoria e parecer)
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: aurumcode-varredura
-          path: ${{ runner.temp }}/aurumcode-out/
